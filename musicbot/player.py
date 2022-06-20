@@ -67,22 +67,21 @@ class PatchedBuff:
     def _frame_vol(self, frame, mult, *, maxv=2, use_audioop=True):
         if use_audioop:
             return audioop.mul(frame, 2, min(mult, maxv))
-        else:
-            # ffmpeg returns s16le pcm frames.
-            frame_array = array("h", frame)
+        # ffmpeg returns s16le pcm frames.
+        frame_array = array("h", frame)
 
-            for i in range(len(frame_array)):
-                frame_array[i] = int(frame_array[i] * min(mult, min(1, maxv)))
+        for i in range(len(frame_array)):
+            frame_array[i] = int(frame_array[i] * min(mult, min(1, maxv)))
 
-            return frame_array.tobytes()
+        return frame_array.tobytes()
 
     def _pprint_meter(self, perc, *, char="#", text="", shift=True):
         tx, ty = get_terminal_size()
 
         if shift:
-            outstr = text + "{}".format(char * (int((tx - len(text)) * perc) - 1))
+            outstr = text + f"{char * (int((tx - len(text)) * perc) - 1)}"
         else:
-            outstr = text + "{}".format(char * (int(tx * perc) - 1))[len(text) :]
+            outstr = text + f"{char * (int(tx * perc) - 1)}"[len(text) :]
 
         print(outstr.ljust(tx - 1), end="\r")
 
@@ -172,12 +171,12 @@ class MusicPlayer(EventEmitter, Serializable):
             self.emit("resume", player=self, entry=self.current_entry)
             return
 
-        if self.is_paused and not self._current_player:
+        if self.is_paused:
             self.state = MusicPlayerState.PLAYING
             self._kill_current_player()
             return
 
-        raise ValueError("Cannot resume playback from state %s" % self.state)
+        raise ValueError(f"Cannot resume playback from state {self.state}")
 
     def pause(self):
         if self.is_playing:
@@ -192,7 +191,7 @@ class MusicPlayer(EventEmitter, Serializable):
         elif self.is_paused:
             return
 
-        raise ValueError("Cannot pause a MusicPlayer in state %s" % self.state)
+        raise ValueError(f"Cannot pause a MusicPlayer in state {self.state}")
 
     def kill(self):
         self.state = MusicPlayerState.DEAD
@@ -224,52 +223,44 @@ class MusicPlayer(EventEmitter, Serializable):
             )
             return
 
-        if not self.bot.config.save_videos and entry:
-            if not isinstance(entry, StreamPlaylistEntry):
-                if any([entry.filename == e.filename for e in self.playlist.entries]):
-                    log.debug(
-                        'Skipping deletion of "{}", found song in queue'.format(
-                            entry.filename
+        if (
+            not self.bot.config.save_videos
+            and entry
+            and not isinstance(entry, StreamPlaylistEntry)
+        ):
+            if any(entry.filename == e.filename for e in self.playlist.entries):
+                log.debug(f'Skipping deletion of "{entry.filename}", found song in queue')
+
+            else:
+                log.debug(f"Deleting file: {os.path.relpath(entry.filename)}")
+                filename = entry.filename
+                for x in range(30):
+                    try:
+                        os.unlink(filename)
+                        log.debug("File deleted: {0}".format(filename))
+                        break
+                    except PermissionError as e:
+                        if e.winerror == 32:  # File is in use
+                            log.error(
+                                "Can't delete file, it is currently in use: {0}".format(
+                                    filename
+                                )
+                            )
+                    except FileNotFoundError:
+                        log.debug(
+                            f"Could not find delete {filename} as it was not found. Skipping.",
+                            exc_info=True,
                         )
+
+                        break
+                    except Exception:
+                        log.error(f"Error trying to delete {filename}", exc_info=True)
+                        break
+                else:
+                    print(
+                        f"[Config:SaveVideos] Could not delete file {os.path.relpath(filename)}, giving up and moving on"
                     )
 
-                else:
-                    log.debug(
-                        "Deleting file: {}".format(os.path.relpath(entry.filename))
-                    )
-                    filename = entry.filename
-                    for x in range(30):
-                        try:
-                            os.unlink(filename)
-                            log.debug("File deleted: {0}".format(filename))
-                            break
-                        except PermissionError as e:
-                            if e.winerror == 32:  # File is in use
-                                log.error(
-                                    "Can't delete file, it is currently in use: {0}".format(
-                                        filename
-                                    )
-                                )
-                        except FileNotFoundError:
-                            log.debug(
-                                "Could not find delete {} as it was not found. Skipping.".format(
-                                    filename
-                                ),
-                                exc_info=True,
-                            )
-                            break
-                        except Exception:
-                            log.error(
-                                "Error trying to delete {}".format(filename),
-                                exc_info=True,
-                            )
-                            break
-                    else:
-                        print(
-                            "[Config:SaveVideos] Could not delete file {}, giving up and moving on".format(
-                                os.path.relpath(filename)
-                            )
-                        )
 
         self.emit("finished-playing", player=self, entry=entry)
 
@@ -316,16 +307,11 @@ class MusicPlayer(EventEmitter, Serializable):
 
                 boptions = "-nostdin"
                 # aoptions = "-vn -b:a 192k"
-                if isinstance(entry, URLPlaylistEntry):
-                    aoptions = entry.aoptions
-                else:
-                    aoptions = "-vn"
-
+                aoptions = entry.aoptions if isinstance(entry, URLPlaylistEntry) else "-vn"
                 log.ffmpeg(
-                    "Creating player with options: {} {} {}".format(
-                        boptions, aoptions, entry.filename
-                    )
+                    f"Creating player with options: {boptions} {aoptions} {entry.filename}"
                 )
+
 
                 self._source = SourcePlaybackCounter(
                     PCMVolumeTransformer(
@@ -440,24 +426,19 @@ class MusicPlayer(EventEmitter, Serializable):
 def filter_stderr(popen: subprocess.Popen, future: asyncio.Future):
     last_ex = None
 
-    while True:
-        data = popen.stderr.readline()
-        if data:
-            log.ffmpeg("Data from ffmpeg: {}".format(data))
-            try:
-                if check_stderr(data):
-                    sys.stderr.buffer.write(data)
-                    sys.stderr.buffer.flush()
+    while data := popen.stderr.readline():
+        log.ffmpeg(f"Data from ffmpeg: {data}")
+        try:
+            if check_stderr(data):
+                sys.stderr.buffer.write(data)
+                sys.stderr.buffer.flush()
 
-            except FFmpegError as e:
-                log.ffmpeg("Error from ffmpeg: %s", str(e).strip())
-                last_ex = e
+        except FFmpegError as e:
+            log.ffmpeg("Error from ffmpeg: %s", str(e).strip())
+            last_ex = e
 
-            except FFmpegWarning:
-                pass  # useless message
-        else:
-            break
-
+        except FFmpegWarning:
+            pass  # useless message
     if last_ex:
         future.set_exception(last_ex)
     else:

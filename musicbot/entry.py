@@ -36,10 +36,7 @@ class BasePlaylistEntry(Serializable):
 
     @property
     def is_downloaded(self):
-        if self._is_downloading:
-            return False
-
-        return bool(self.filename)
+        return False if self._is_downloading else bool(self.filename)
 
     async def _download(self):
         raise NotImplementedError
@@ -96,13 +93,11 @@ class URLPlaylistEntry(BasePlaylistEntry):
         self.url = url
         self.title = title
         self.duration = duration
-        if duration == None:  # duration could be 0
+        if duration is None:  # duration could be 0
             log.info(
-                "Cannot extract duration of the entry. This does not affect the ability of the bot. "
-                "However, estimated time for this entry will not be unavailable and estimated time "
-                "of the queue will also not be available until this entry got downloaded.\n"
-                "entry name: {}".format(self.title)
+                f"Cannot extract duration of the entry. This does not affect the ability of the bot. However, estimated time for this entry will not be unavailable and estimated time of the queue will also not be available until this entry got downloaded.\nentry name: {self.title}"
             )
+
         self.expected_filename = expected_filename
         self.meta = meta
         self.aoptions = "-vn"
@@ -159,10 +154,9 @@ class URLPlaylistEntry(BasePlaylistEntry):
                 )
                 if not meta["channel"]:
                     log.warning(
-                        "Cannot find channel in an entry loaded from persistent queue. Chennel id: {}".format(
-                            data["meta"]["channel"]["id"]
-                        )
+                        f'Cannot find channel in an entry loaded from persistent queue. Chennel id: {data["meta"]["channel"]["id"]}'
                     )
+
                     meta.pop("channel")
                 elif "author" in data["meta"]:
                     # int() it because persistent queue from pre-rewrite days saved ids as strings
@@ -171,10 +165,9 @@ class URLPlaylistEntry(BasePlaylistEntry):
                     )
                     if not meta["author"]:
                         log.warning(
-                            "Cannot find author in an entry loaded from persistent queue. Author id: {}".format(
-                                data["meta"]["author"]["id"]
-                            )
+                            f'Cannot find author in an entry loaded from persistent queue. Author id: {data["meta"]["author"]["id"]}'
                         )
+
                         meta.pop("author")
 
             entry = cls(playlist, url, title, duration, expected_filename, **meta)
@@ -182,7 +175,7 @@ class URLPlaylistEntry(BasePlaylistEntry):
 
             return entry
         except Exception as e:
-            log.error("Could not load {}".format(cls.__name__), exc_info=e)
+            log.error(f"Could not load {cls.__name__}", exc_info=e)
 
     # noinspection PyTypeChecker
     async def _download(self):
@@ -251,25 +244,21 @@ class URLPlaylistEntry(BasePlaylistEntry):
                     self.filename = os.path.join(
                         self.download_folder, expected_fname_base
                     )
-                    log.info("Download cached: {}".format(self.url))
+                    log.info(f"Download cached: {self.url}")
 
                 elif expected_fname_noex in flistdir:
-                    log.info(
-                        "Download cached (different extension): {}".format(self.url)
-                    )
+                    log.info(f"Download cached (different extension): {self.url}")
                     self.filename = os.path.join(
                         self.download_folder, ldir[flistdir.index(expected_fname_noex)]
                     )
                     log.debug(
-                        "Expected {}, got {}".format(
-                            self.expected_filename.rsplit(".", 1)[-1],
-                            self.filename.rsplit(".", 1)[-1],
-                        )
+                        f'Expected {self.expected_filename.rsplit(".", 1)[-1]}, got {self.filename.rsplit(".", 1)[-1]}'
                     )
+
                 else:
                     await self._really_download()
 
-            if self.duration == None:
+            if self.duration is None:
                 if pymediainfo:
                     try:
                         mediainfo = pymediainfo.MediaInfo.parse(self.filename)
@@ -301,18 +290,14 @@ class URLPlaylistEntry(BasePlaylistEntry):
 
                 if not self.duration:
                     log.error(
-                        "Cannot extract duration of downloaded entry, invalid output from ffprobe or pymediainfo. "
-                        "This does not affect the ability of the bot. However, estimated time for this entry "
-                        "will not be unavailable and estimated time of the queue will also not be available "
-                        "until this entry got removed.\n"
-                        "entry file: {}".format(self.filename)
+                        f"Cannot extract duration of downloaded entry, invalid output from ffprobe or pymediainfo. This does not affect the ability of the bot. However, estimated time for this entry will not be unavailable and estimated time of the queue will also not be available until this entry got removed.\nentry file: {self.filename}"
                     )
+
                 else:
                     log.debug(
-                        "Get duration of {} as {} seconds by inspecting it directly".format(
-                            self.filename, self.duration
-                        )
+                        f"Get duration of {self.filename} as {self.duration} seconds by inspecting it directly"
                     )
+
 
             if self.playlist.bot.config.use_experimental_equalization:
                 try:
@@ -350,7 +335,7 @@ class URLPlaylistEntry(BasePlaylistEntry):
         def is_exe(fpath):
             found = os.path.isfile(fpath) and os.access(fpath, os.X_OK)
             if not found and sys.platform == "win32":
-                fpath = fpath + ".exe"
+                fpath = f"{fpath}.exe"
                 found = os.path.isfile(fpath) and os.access(fpath, os.X_OK)
             return found
 
@@ -379,59 +364,56 @@ class URLPlaylistEntry(BasePlaylistEntry):
         output = await self.run_command(cmd)
         output = output.decode("utf-8")
         log.debug(output)
-        # print('----', output)
-
-        I_matches = re.findall(r'"input_i" : "([-]?([0-9]*\.[0-9]+))",', output)
-        if I_matches:
-            log.debug("I_matches={}".format(I_matches[0][0]))
+        if I_matches := re.findall(
+            r'"input_i" : "([-]?([0-9]*\.[0-9]+))",', output
+        ):
+            log.debug(f"I_matches={I_matches[0][0]}")
             I = float(I_matches[0][0])
         else:
             log.debug("Could not parse I in normalise json.")
             I = float(0)
 
-        LRA_matches = re.findall(r'"input_lra" : "([-]?([0-9]*\.[0-9]+))",', output)
-        if LRA_matches:
-            log.debug("LRA_matches={}".format(LRA_matches[0][0]))
+        if LRA_matches := re.findall(
+            r'"input_lra" : "([-]?([0-9]*\.[0-9]+))",', output
+        ):
+            log.debug(f"LRA_matches={LRA_matches[0][0]}")
             LRA = float(LRA_matches[0][0])
         else:
             log.debug("Could not parse LRA in normalise json.")
             LRA = float(0)
 
-        TP_matches = re.findall(r'"input_tp" : "([-]?([0-9]*\.[0-9]+))",', output)
-        if TP_matches:
-            log.debug("TP_matches={}".format(TP_matches[0][0]))
+        if TP_matches := re.findall(
+            r'"input_tp" : "([-]?([0-9]*\.[0-9]+))",', output
+        ):
+            log.debug(f"TP_matches={TP_matches[0][0]}")
             TP = float(TP_matches[0][0])
         else:
             log.debug("Could not parse TP in normalise json.")
             TP = float(0)
 
-        thresh_matches = re.findall(
+        if thresh_matches := re.findall(
             r'"input_thresh" : "([-]?([0-9]*\.[0-9]+))",', output
-        )
-        if thresh_matches:
-            log.debug("thresh_matches={}".format(thresh_matches[0][0]))
+        ):
+            log.debug(f"thresh_matches={thresh_matches[0][0]}")
             thresh = float(thresh_matches[0][0])
         else:
             log.debug("Could not parse thresh in normalise json.")
             thresh = float(0)
 
-        offset_matches = re.findall(
+        if offset_matches := re.findall(
             r'"target_offset" : "([-]?([0-9]*\.[0-9]+))', output
-        )
-        if offset_matches:
-            log.debug("offset_matches={}".format(offset_matches[0][0]))
+        ):
+            log.debug(f"offset_matches={offset_matches[0][0]}")
             offset = float(offset_matches[0][0])
         else:
             log.debug("Could not parse offset in normalise json.")
             offset = float(0)
 
-        return "-af loudnorm=I=-24.0:LRA=7.0:TP=-2.0:linear=true:measured_I={}:measured_LRA={}:measured_TP={}:measured_thresh={}:offset={}".format(
-            I, LRA, TP, thresh, offset
-        )
+        return f"-af loudnorm=I=-24.0:LRA=7.0:TP=-2.0:linear=true:measured_I={I}:measured_LRA={LRA}:measured_TP={TP}:measured_thresh={thresh}:offset={offset}"
 
     # noinspection PyShadowingBuiltins
     async def _really_download(self, *, hash=False):
-        log.info("Download started: {}".format(self.url))
+        log.info(f"Download started: {self.url}")
 
         retry = True
         while retry:
@@ -443,7 +425,7 @@ class URLPlaylistEntry(BasePlaylistEntry):
             except Exception as e:
                 raise ExtractionError(e)
 
-        log.info("Download complete: {}".format(self.url))
+        log.info(f"Download complete: {self.url}")
 
         if result is None:
             log.critical("YTDL has failed, everyone panic")
@@ -530,7 +512,7 @@ class StreamPlaylistEntry(BasePlaylistEntry):
 
             return entry
         except Exception as e:
-            log.error("Could not load {}".format(cls.__name__), exc_info=e)
+            log.error(f"Could not load {cls.__name__}", exc_info=e)
 
     # noinspection PyMethodOverriding
     async def _download(self, *, fallback=False):

@@ -74,17 +74,17 @@ class Permissions:
             except Exception as e:
                 traceback.print_exc()
                 raise RuntimeError(
-                    "Unable to copy config/example_permissions.ini to {}: {}".format(
-                        config_file, e
-                    )
+                    f"Unable to copy config/example_permissions.ini to {config_file}: {e}"
                 )
 
-        self.default_group = PermissionGroup("Default", self.config["Default"])
-        self.groups = set()
 
-        for section in self.config.sections():
-            if section != "Owner (auto)":
-                self.groups.add(PermissionGroup(section, self.config[section]))
+        self.default_group = PermissionGroup("Default", self.config["Default"])
+        self.groups = {
+            PermissionGroup(section, self.config[section])
+            for section in self.config.sections()
+            if section != "Owner (auto)"
+        }
+
 
         if self.config.has_section("Owner (auto)"):
             owner_group = PermissionGroup(
@@ -210,10 +210,10 @@ class PermissionGroup:
             self.ignore_non_voice = set(self.ignore_non_voice.lower().split())
 
         if self.granted_to_roles:
-            self.granted_to_roles = set([int(x) for x in self.granted_to_roles.split()])
+            self.granted_to_roles = {int(x) for x in self.granted_to_roles.split()}
 
         if self.user_list:
-            self.user_list = set([int(x) for x in self.user_list.split()])
+            self.user_list = {int(x) for x in self.user_list.split()}
 
         if self.extractors:
             self.extractors = set(self.extractors.split())
@@ -269,7 +269,7 @@ class PermissionGroup:
             self.user_list.remove(uid)
 
     def __repr__(self):
-        return "<PermissionGroup: %s>" % self.name
+        return f"<PermissionGroup: {self.name}>"
 
     def __str__(self):
-        return "<PermissionGroup: %s: %s>" % (self.name, self.__dict__)
+        return f"<PermissionGroup: {self.name}: {self.__dict__}>"

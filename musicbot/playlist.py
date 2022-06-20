@@ -71,12 +71,10 @@ class Playlist(EventEmitter, Serializable):
                 self.loop, song_url, download=False
             )
         except Exception as e:
-            raise ExtractionError(
-                "Could not extract information from {}\n\n{}".format(song_url, e)
-            )
+            raise ExtractionError(f"Could not extract information from {song_url}\n\n{e}")
 
         if not info:
-            raise ExtractionError("Could not extract information from %s" % song_url)
+            raise ExtractionError(f"Could not extract information from {song_url}")
 
         # TODO: Sort out what happens next when this happens
         if info.get("_type", None) == "playlist":
@@ -95,16 +93,16 @@ class Playlist(EventEmitter, Serializable):
             try:
                 headers = await get_header(self.bot.aiosession, info["url"])
                 content_type = headers.get("CONTENT-TYPE")
-                log.debug("Got content type {}".format(content_type))
+                log.debug(f"Got content type {content_type}")
             except Exception as e:
-                log.warning(
-                    "Failed to get content type for url {} ({})".format(song_url, e)
-                )
+                log.warning(f"Failed to get content type for url {song_url} ({e})")
                 content_type = None
 
             if content_type:
                 if content_type.startswith(("application/", "image/")):
-                    if not any(x in content_type for x in ("/ogg", "/octet-stream")):
+                    if all(
+                        x not in content_type for x in ("/ogg", "/octet-stream")
+                    ):
                         # How does a server say `application/ogg` what the actual fuck
                         raise ExtractionError(
                             'Invalid content type "%s" for url %s'
@@ -123,11 +121,7 @@ class Playlist(EventEmitter, Serializable):
                     )  # TODO: Check for shoutcast/icecast
 
                 elif not content_type.startswith(("audio/", "video/")):
-                    log.warning(
-                        'Questionable content-type "{}" for url {}'.format(
-                            content_type, song_url
-                        )
-                    )
+                    log.warning(f'Questionable content-type "{content_type}" for url {song_url}')
 
         entry = URLPlaylistEntry(
             self,
@@ -170,15 +164,14 @@ class Playlist(EventEmitter, Serializable):
 
                 else:
                     # traceback.print_exc()
-                    raise ExtractionError("Unknown error: {}".format(e))
+                    raise ExtractionError(f"Unknown error: {e}")
 
             except Exception as e:
                 log.error(
-                    "Could not extract information from {} ({}), falling back to direct".format(
-                        song_url, e
-                    ),
+                    f"Could not extract information from {song_url} ({e}), falling back to direct",
                     exc_info=True,
                 )
+
 
         if (
             info.get("is_live") is None and info.get("extractor", None) != "generic"
@@ -220,13 +213,12 @@ class Playlist(EventEmitter, Serializable):
             )
         except Exception as e:
             raise ExtractionError(
-                "Could not extract information from {}\n\n{}".format(playlist_url, e)
+                f"Could not extract information from {playlist_url}\n\n{e}"
             )
 
+
         if not info:
-            raise ExtractionError(
-                "Could not extract information from %s" % playlist_url
-            )
+            raise ExtractionError(f"Could not extract information from {playlist_url}")
 
         # Once again, the generic extractor fucks things up.
         if info.get("extractor", None) == "generic":
@@ -255,12 +247,12 @@ class Playlist(EventEmitter, Serializable):
                 except Exception as e:
                     baditems += 1
                     log.warning("Could not add item", exc_info=e)
-                    log.debug("Item: {}".format(item), exc_info=True)
+                    log.debug(f"Item: {item}", exc_info=True)
             else:
                 baditems += 1
 
         if baditems:
-            log.info("Skipped {} bad entries".format(baditems))
+            log.info(f"Skipped {baditems} bad entries")
 
         if head:
             entry_list.reverse()
@@ -280,13 +272,12 @@ class Playlist(EventEmitter, Serializable):
             )
         except Exception as e:
             raise ExtractionError(
-                "Could not extract information from {}\n\n{}".format(playlist_url, e)
+                f"Could not extract information from {playlist_url}\n\n{e}"
             )
 
+
         if not info:
-            raise ExtractionError(
-                "Could not extract information from %s" % playlist_url
-            )
+            raise ExtractionError(f"Could not extract information from {playlist_url}")
 
         gooditems = []
         baditems = 0
@@ -297,7 +288,7 @@ class Playlist(EventEmitter, Serializable):
         for entry_data in info["entries"]:
             if entry_data:
                 baseurl = info["webpage_url"].split("playlist?list=")[0]
-                song_url = baseurl + "watch?v=%s" % entry_data["id"]
+                song_url = baseurl + f'watch?v={entry_data["id"]}'
 
                 try:
                     entry, elen = await self.add_entry(song_url, head=head, **meta)
@@ -308,14 +299,12 @@ class Playlist(EventEmitter, Serializable):
 
                 except Exception as e:
                     baditems += 1
-                    log.error(
-                        "Error adding entry {}".format(entry_data["id"]), exc_info=e
-                    )
+                    log.error(f'Error adding entry {entry_data["id"]}', exc_info=e)
             else:
                 baditems += 1
 
         if baditems:
-            log.info("Skipped {} bad entries".format(baditems))
+            log.info(f"Skipped {baditems} bad entries")
 
         if head:
             gooditems.reverse()
@@ -335,13 +324,12 @@ class Playlist(EventEmitter, Serializable):
             )
         except Exception as e:
             raise ExtractionError(
-                "Could not extract information from {}\n\n{}".format(playlist_url, e)
+                f"Could not extract information from {playlist_url}\n\n{e}"
             )
 
+
         if not info:
-            raise ExtractionError(
-                "Could not extract information from %s" % playlist_url
-            )
+            raise ExtractionError(f"Could not extract information from {playlist_url}")
 
         gooditems = []
         baditems = 0
@@ -362,14 +350,12 @@ class Playlist(EventEmitter, Serializable):
 
                 except Exception as e:
                     baditems += 1
-                    log.error(
-                        "Error adding entry {}".format(entry_data["id"]), exc_info=e
-                    )
+                    log.error(f'Error adding entry {entry_data["id"]}', exc_info=e)
             else:
                 baditems += 1
 
         if baditems:
-            log.info("Skipped {} bad entries".format(baditems))
+            log.info(f"Skipped {baditems} bad entries")
 
         if head:
             gooditems.reverse()
@@ -402,8 +388,7 @@ class Playlist(EventEmitter, Serializable):
         entry = self.entries.popleft()
 
         if predownload_next:
-            next_entry = self.peek()
-            if next_entry:
+            if next_entry := self.peek():
                 next_entry.get_ready_future()
 
         return await entry.get_ready_future()
@@ -419,14 +404,14 @@ class Playlist(EventEmitter, Serializable):
         """
         (very) Roughly estimates the time till the queue will 'position'
         """
-        if any(e.duration == None for e in islice(self.entries, position - 1)):
+        if any(e.duration is None for e in islice(self.entries, position - 1)):
             raise InvalidDataError("no duration data")
         else:
             estimated_time = sum(e.duration for e in islice(self.entries, position - 1))
 
         # When the player plays a song, it eats the first playlist item, so we just have to add the time back
         if not player.is_stopped and player.current_entry:
-            if player.current_entry.duration == None:  # duration can be 0
+            if player.current_entry.duration is None:  # duration can be 0
                 raise InvalidDataError("no duration data in current entry")
             else:
                 estimated_time += player.current_entry.duration - player.progress
@@ -434,7 +419,7 @@ class Playlist(EventEmitter, Serializable):
         return datetime.timedelta(seconds=estimated_time)
 
     def count_for_user(self, user):
-        return sum(1 for e in self.entries if e.meta.get("author", None) == user)
+        return sum(e.meta.get("author", None) == user for e in self.entries)
 
     def __json__(self):
         return self._enclose_json({"entries": list(self.entries)})
