@@ -111,8 +111,10 @@ class HelpfulError(MusicbotException):
 
         lines = textwrap.wrap(text, width=width - 5)
         lines = (
-            ("    " + line).rstrip().ljust(width - 1).rstrip() + "\n" for line in lines
+            f"    {line}".rstrip().ljust(width - 1).rstrip() + "\n"
+            for line in lines
         )
+
 
         return pretext + "".join(lines).rstrip()
 

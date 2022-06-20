@@ -7,7 +7,7 @@ import sys
 
 def y_n(q):
     while True:
-        ri = input("{} (y/n): ".format(q))
+        ri = input(f"{q} (y/n): ")
         if ri.lower() in ["yes", "y"]:
             return True
         elif ri.lower() in ["no", "n"]:
@@ -19,11 +19,10 @@ def update_deps():
 
     try:
         subprocess.check_call(
-            '"{}" -m pip install --no-warn-script-location --user -U -r requirements.txt'.format(
-                sys.executable
-            ),
+            f'"{sys.executable}" -m pip install --no-warn-script-location --user -U -r requirements.txt',
             shell=True,
         )
+
     except subprocess.CalledProcessError:
         raise OSError(
             "Could not update dependencies. You will need to run '\"{0}\" -m pip install -U -r requirements.txt' yourself.".format(
@@ -63,25 +62,21 @@ def main():
 
     print("Passed Git checks...")
 
-    # Check that the current working directory is clean
-    sp = subprocess.check_output(
+    if sp := subprocess.check_output(
         "git status --porcelain", shell=True, universal_newlines=True
-    )
-    if sp:
-        oshit = y_n(
+    ):
+        if oshit := y_n(
             "You have modified files that are tracked by Git (e.g the bot's source files).\n"
             "Should we try resetting the repo? You will lose local modifications."
-        )
-        if oshit:
+        ):
             try:
                 subprocess.check_call("git reset --hard", shell=True)
             except subprocess.CalledProcessError:
                 raise OSError("Could not reset the directory to a clean state.")
         else:
-            wowee = y_n(
+            if wowee := y_n(
                 "OK, skipping bot update. Do you still want to update dependencies?"
-            )
-            if wowee:
+            ):
                 update_deps()
             else:
                 finalize()
